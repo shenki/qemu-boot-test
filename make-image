@@ -1,23 +1,45 @@
-git clone https://github.com/legoater/qemu
-cd qemu
-git checkout aspeed-6.0
-./configure --without-default-features --disable-sdl --disable-gtk --disable-vnc --disable-curses --disable-docs --target-list=arm-softmmu
-make -j`nproc`
-cd ..
+#!/bin/bash
 
-git clone https://github.com/shenki/u-boot
+
+if [ ! -f "qemu" ] ; then
+	echo "Fetching qemu"
+	git clone https://github.com/legoater/qemu
+fi
+
+if [ ! -f "qemu/build/qemu-system-arm" ]; then
+	cd qemu
+	git checkout aspeed-6.0
+
+	echo "Configuring qemu"
+	./configure --without-default-features --disable-sdl --disable-gtk --disable-vnc --disable-curses --disable-docs --target-list=arm-softmmu
+
+	echo "Building qemu"
+	make -j"$(nproc)"
+	cd ..
+fi
+
+if [ ! -f "qemu" ] ; then
+	echo "Fetching u-boot"
+	git clone https://github.com/shenki/u-boot
+fi
+
+cd u-boot
 git checkout aspeed-hace-v2
 
 echo "Configuring u-boot"
-make -s -j`nproc` ARCH=arm ast2600_openbmc_spl_emmc_defconfig
+make -s -j"$(nproc)" ARCH=arm ast2600_openbmc_spl_emmc_defconfig
 
 echo "Building u-boot"
-make -s -j`nproc` ARCH=arm CROSS_COMPILE="ccache arm-linux-gnueabi-"
+make -s -j"$(nproc)" ARCH=arm CROSS_COMPILE="ccache arm-linux-gnueabi-"
 
-echo "Generating keys"
+
+if [ ! -f keys ]; then
+	echo "Generating keys"
+	openssl genpkey -algorithm RSA -out keys/dev.key -pkeyopt rsa_keygen_bits:4096 -pkeyopt rsa_keygen_pubexp:65537
+fi
 
 echo "Creating FIT"
-tools/mkimage -f u-boot.its -r -E -k keys -K u-boot-spl.dtb u-boot-signed.img
+tools/mkimage -f ../u-boot.its -r -E -k keys -K u-boot-spl.dtb u-boot-signed.img
 
 echo "Creating image"
 dd if=/dev/zero of=test.img bs=1M count=16
@@ -26,4 +48,4 @@ dd if=u-boot-signed.img of=test.img conv=notrunc seek=64 bs=1024
 
 ../qemu/build/qemu-system-arm -M rainier-bmc -nographic \
 		-nic user,tftp=u-boot \
-		-drive file=test.img,if=sd,format=raw,index=2"
+		-drive file=test.img,if=sd,format=raw,index=2
