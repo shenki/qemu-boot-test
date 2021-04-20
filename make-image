@@ -1,0 +1,29 @@
+git clone https://github.com/legoater/qemu
+cd qemu
+git checkout aspeed-6.0
+./configure --without-default-features --disable-sdl --disable-gtk --disable-vnc --disable-curses --disable-docs --target-list=arm-softmmu
+make -j`nproc`
+cd ..
+
+git clone https://github.com/shenki/u-boot
+git checkout aspeed-hace-v2
+
+echo "Configuring u-boot"
+make -s -j`nproc` ARCH=arm ast2600_openbmc_spl_emmc_defconfig
+
+echo "Building u-boot"
+make -s -j`nproc` ARCH=arm CROSS_COMPILE="ccache arm-linux-gnueabi-"
+
+echo "Generating keys"
+
+echo "Creating FIT"
+tools/mkimage -f u-boot.its -r -E -k keys -K u-boot-spl.dtb u-boot-signed.img
+
+echo "Creating image"
+dd if=/dev/zero of=test.img bs=1M count=16
+dd if=u-boot-spl.img of=test.img conv=notrunc
+dd if=u-boot-signed.img of=test.img conv=notrunc seek=64 bs=1024
+
+../qemu/build/qemu-system-arm -M rainier-bmc -nographic \
+		-nic user,tftp=u-boot \
+		-drive file=test.img,if=sd,format=raw,index=2"

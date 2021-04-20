@@ -1,0 +1,47 @@
+/dts-v1/;
+
+/ {
+    description = "u-boot FIT";
+    #address-cells = <1>;
+
+    images {
+        uboot {
+            description = "U-Boot binary";
+            data = /incbin/("u-boot-nodtb.bin");
+            type = "kernel";
+            os = "u-boot";
+            arch = "arm";
+            compression = "none";
+            load = <0x81000000>;
+            entry = <0x81000000>;
+            hash {
+                algo = "sha512";
+            };
+        };
+        fdt {
+            description = "U-Boot FDT";
+            data = /incbin/("u-boot.dtb");
+            type = "flat_dt";
+            arch = "arm";
+            compression = "none";
+            hash {
+                algo = "sha512";
+            };
+        };
+    };
+
+    configurations {
+        default = "conf";
+        conf {
+            description = "u-boot with FIT, signed";
+            loadables = "uboot";
+            fdt = "fdt";
+
+            signature {
+                algo = "sha512,rsa4096";
+		key-name-hint = "dev";
+		sign-images = "fdt", "loadables";
+            };
+        };
+    };
+};
